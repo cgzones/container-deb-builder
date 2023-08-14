@@ -77,11 +77,24 @@ cd /build/source
 log "Installing build dependencies"
 mk-build-deps -ir -t "apt-get -o Debug::pkgProblemResolver=yes -y --no-install-recommends"
 
+# dovecot_2.3.20+dfsg1.orig.tar.gz
+name="$(dpkg-parsechangelog -S Source)_$(dpkg-parsechangelog -S Version | sed -e 's/-[^-]*$//' | sed -e 's/^[0-9]*://').orig.tar.gz"
+tar --create --file "../${name}" --gzip --preserve-permissions --exclude './debian' --exclude './.git' .
+
 # Build packages
 log "Building package with DEB_BUILD_OPTIONS set to '${DEB_BUILD_OPTIONS:-}'"
 BUILD_START_TIME="$EPOCHSECONDS"
 runuser -u build-runner -- debuild --prepend-path /usr/lib/ccache --preserve-envvar CCACHE_DIR --sanitize-env -rfakeroot -b --no-sign -sa | tee /build/build.log
 log "Build completed in $((EPOCHSECONDS - BUILD_START_TIME)) seconds"
+
+#runuser -u build-runner -- dpkg-source --before-build .
+#runuser -u build-runner -- dpkg-buildpackage --sanitize-env -us -uc -rfakeroot -sa --source-option=--format='3.0 (native)'
+
+if [ -n "${BUILD_TWICE+x}" ]; then
+    log "Building package the second time"
+    #debuild --prepend-path /usr/lib/ccache --preserve-envvar CCACHE_DIR -b -uc -us --sanitize-env
+    runuser -u build-runner -- dpkg-buildpackage --sanitize-env -us -uc -rfakeroot -S
+fi
 
 if [ -n "${USE_CCACHE+x}" ]; then
     log "ccache statistics"

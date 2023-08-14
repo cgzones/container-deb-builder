@@ -32,6 +32,7 @@ Options:
   -L           Run Lintian after a successful build.
   -B           Run blhc after a successful build.
   -t           Reset file modification timestamps to changelog entry.
+  -T           Build package twice.
 EOF
     exit 1
 }
@@ -56,7 +57,7 @@ function sanitize_string {
 
 [[ $# -eq 0 ]] && usage
 
-while getopts "c:i:o:p:d:htBCL" opt; do
+while getopts "c:i:o:p:d:htBCLT" opt; do
     case $opt in
         c)
             tool="$OPTARG"
@@ -78,6 +79,10 @@ while getopts "c:i:o:p:d:htBCL" opt; do
             ;;
         B)
             run_blhc=1
+            ;;
+
+        T)
+            build_twice=1
             ;;
         C)
             use_ccache=1
@@ -177,6 +182,11 @@ fi
 # pass whether to reset timestamps
 if [[ "$reset_timestamps" ]]; then
     docker_args+="--env RESET_TIMESTAMPS=1 "
+fi
+
+# pass whether to build twice
+if [[ "$build_twice" ]]; then
+    docker_args+="--env BUILD_TWICE=1 "
 fi
 
 # disable any selinux stuff while using rh and derivates with podman
