@@ -52,7 +52,7 @@ if [ -d "${CDEBB_DIR}/dependencies" ]; then
     apt-get -f install -y --no-install-recommends
 fi
 
-adduser --system --no-create-home build-runner
+useradd --system --user-group --no-create-home --shell /usr/sbin/nologin build-runner
 
 # Install ccache
 if [ -n "${USE_CCACHE+x}" ]; then
@@ -92,9 +92,9 @@ fi
 
 BUILD_START_TIME="$EPOCHSECONDS"
 # supported since Debian 12 (bookworm)
-if unshare --map-users 1,1,100 --help &> /dev/null; then
+if unshare --map-users 1,1,1000 --help &> /dev/null; then
     # shellcheck disable=SC2086
-    unshare --user --map-root-user --net --map-users 1,1,100 --map-users 65534,65534,1 --map-groups 1,1,100 --map-groups 65534,65534,1 --setuid "$(id -u build-runner)" --setgid "$(id -g build-runner)" -- env PATH="/usr/lib/ccache:$PATH" dpkg-buildpackage -rfakeroot -b --no-sign -sa ${debuild_args} 2>&1 | tee "${CDEBB_BUILD_DIR}/build.log"
+    unshare --user --map-root-user --net --map-users 1,1,1000 --map-users 65534,65534,1 --map-groups 1,1,1000 --map-groups 65534,65534,1 --setuid "$(id -u build-runner)" --setgid "$(id -g build-runner)" -- env PATH="/usr/lib/ccache:$PATH" dpkg-buildpackage -rfakeroot -b --no-sign -sa ${debuild_args} 2>&1 | tee "${CDEBB_BUILD_DIR}/build.log"
 else
     log "unshare(1) does not support --map-users, falling back to runuser(1); build has network access"
     # shellcheck disable=SC2086
@@ -118,7 +118,7 @@ fi
 if [ -n "${RUN_LINTIAN+x}" ]; then
     log "Installing Lintian"
     apt-get install -y --no-install-recommends lintian
-    adduser --system --no-create-home lintian-runner
+    useradd --system --user-group --no-create-home --shell /usr/sbin/nologin lintian-runner
     log "+++ Lintian Report Start +++"
     # supported since Debian 11 (bullseye)
     if lintian --help | grep -w -- '--fail-on\b' &> /dev/null; then
