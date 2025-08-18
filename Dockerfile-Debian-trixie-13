@@ -1,0 +1,20 @@
+FROM debian:trixie
+
+RUN sed -i -- 's/Types: deb/Types: deb deb-src/g' /etc/apt/sources.list.d/debian.sources
+RUN echo 'man-db man-db/auto-update boolean false' | debconf-set-selections
+RUN set -ex \
+    && apt-get update \
+    && apt-get upgrade -y --no-install-recommends --purge \
+    && apt-get dist-upgrade -y --no-install-recommends --purge \
+    && apt-get install -y --no-install-recommends --purge \
+               build-essential \
+               cdbs \
+               devscripts \
+               equivs \
+               fakeroot \
+    && apt-mark minimize-manual -y \
+    && apt-get autopurge -y \
+    && apt-get clean
+RUN rm /etc/apt/apt.conf.d/docker-clean
+RUN rm -rf /tmp/* /var/tmp/
+RUN ln -s /tmp /var/tmp
