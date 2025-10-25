@@ -131,7 +131,7 @@ fi
 
 # Drop color escape sequences from logs
 cd "${CDEBB_BUILD_DIR}"
-sed -E -e 's/\x1b\[[0-9;]+[mK]//g' --in-place=.color -- *.log
+sed -E -e 's/\x1b\[[0-9;]+[mK]//g' --in-place=.color.log -- *.log
 
 # Run blhc
 if [ -n "${RUN_BLHC+x}" ]; then
@@ -140,18 +140,18 @@ if [ -n "${RUN_BLHC+x}" ]; then
     log "+++ blhc Report Start +++"
     blhc --all --color "${CDEBB_BUILD_DIR}/build.log" 2>&1 | tee "${CDEBB_BUILD_DIR}/blhc.log" || true
     log "+++ blhc Report End +++"
-    sed -E -e 's/\x1b\[[0-9;]+[mK]//g' --in-place=.color "${CDEBB_BUILD_DIR}/blhc.log"
+    sed -E -e 's/\x1b\[[0-9;]+[mK]//g' --in-place=.color.log "${CDEBB_BUILD_DIR}/blhc.log"
 fi
 
 # Copy packages to output dir with user's permissions
 if [ -n "${USER+x}" ] && [ -n "${GROUP+x}" ]; then
-    chown "${USER}:${GROUP}" -- *.deb *.buildinfo *.changes *.log *.log.color
+    chown "${USER}:${GROUP}" -- *.deb *.buildinfo *.changes *.log
 else
-    chown root:root -- *.deb *.buildinfo *.changes *.log *.log.color
+    chown root:root -- *.deb *.buildinfo *.changes *.log
 fi
-cp -a -- *.deb *.buildinfo *.changes *.log *.log.color "${CDEBB_DIR}/output/"
+cp -a -- *.deb *.buildinfo *.changes *.log "${CDEBB_DIR}/output/"
 
 log "Generated files:"
-ls -l --almost-all --color=always --human-readable --ignore={*.log,*.log.color} "${CDEBB_DIR}/output"
+ls -l --almost-all --color=always --human-readable --ignore=*.log "${CDEBB_DIR}/output"
 
 log "Finished in $((EPOCHSECONDS - CONTAINER_START_TIME)) seconds"
