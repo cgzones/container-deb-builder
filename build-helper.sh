@@ -129,9 +129,12 @@ if [ -n "${RUN_LINTIAN+x}" ]; then
     log "+++ Lintian Report End +++"
 fi
 
-# Drop color escape sequences from logs
+# Save colored versions of logs before stripping ANSI escape sequences
 cd "${CDEBB_BUILD_DIR}"
-sed -E -e 's/\x1b\[[0-9;]+[mK]//g' --in-place=.color.log -- *.log
+for f in *.log; do
+    cp "$f" "${f%.log}.color.log"
+    sed -E -i 's/\x1b\[[0-9;]*[a-zA-Z]//g' "$f"
+done
 
 # Run blhc
 if [ -n "${RUN_BLHC+x}" ]; then
@@ -140,7 +143,8 @@ if [ -n "${RUN_BLHC+x}" ]; then
     log "+++ blhc Report Start +++"
     blhc --all --color "${CDEBB_BUILD_DIR}/build.log" 2>&1 | tee "${CDEBB_BUILD_DIR}/blhc.log" || true
     log "+++ blhc Report End +++"
-    sed -E -e 's/\x1b\[[0-9;]+[mK]//g' --in-place=.color.log "${CDEBB_BUILD_DIR}/blhc.log"
+    cp "${CDEBB_BUILD_DIR}/blhc.log" "${CDEBB_BUILD_DIR}/blhc.color.log"
+    sed -E -i 's/\x1b\[[0-9;]*[a-zA-Z]//g' "${CDEBB_BUILD_DIR}/blhc.log"
 fi
 
 # Copy packages to output dir with user's permissions
