@@ -78,8 +78,8 @@ function sanitize_string {
 while getopts "c:i:o:p:d:htBCL" opt; do
     case $opt in
         c)
-            [[ "$tool" ]] && fatal "Container engine specified multiple times"
-            tool="$OPTARG"
+            [[ ${#tool[@]} -gt 0 ]] && fatal "Container engine specified multiple times"
+            read -ra tool <<< "$OPTARG"
             ;;
         i)
             [[ "$image" ]] && fatal "Build image specified multiple times"
@@ -129,30 +129,34 @@ shift
 extra_args=("$@")
 [[ $# -ne 0 ]] && fatal "invalid trailing command line argument(s): ${extra_args[*]}"
 
-if [[ ! "$tool" ]]; then
+if [[ ${#tool[@]} -eq 0 ]]; then
     if command -v podman >/dev/null 2>&1; then
-        tool='podman'
+        tool=(podman)
     elif command -v docker >/dev/null 2>&1; then
-        tool='docker'
+        tool=(docker)
     elif command -v distrobox-host-exec >/dev/null 2>&1; then
         if distrobox-host-exec podman --version >/dev/null 2>&1; then
-            tool='distrobox-host-exec podman'
+            tool=(distrobox-host-exec podman)
         elif distrobox-host-exec docker --version >/dev/null 2>&1; then
-            tool='distrobox-host-exec docker'
+            tool=(distrobox-host-exec docker)
         fi
     elif command -v flatpak-spawn >/dev/null 2>&1; then
         if flatpak-spawn --host podman --version >/dev/null 2>&1; then
-            tool='flatpak-spawn --host podman'
+            tool=(flatpak-spawn --host podman)
         elif flatpak-spawn --host docker --version >/dev/null 2>&1; then
-            tool='flatpak-spawn --host docker'
+            tool=(flatpak-spawn --host docker)
         fi
     fi
 fi
 
-[[ ! "$tool" ]] && fatal "neither podman nor docker found"
-tool_version=$($tool --version)
+[[ ${#tool[@]} -eq 0 ]] && fatal "neither podman nor docker found"
+tool_version=$("${tool[@]}" --version)
 
-tool_args="--interactive --tty "
+tool_args=(--interactive)
+
+if [ -t 0 ] && [ -t 1 ]; then
+    tool_args+=(--tty)
+fi
 
 # Check that mandatory parameters are valid
 [[ !    "$outdir"        ]] && fatal "output directory was not given (-o DIR)"
@@ -165,64 +169,63 @@ tool_args="--interactive --tty "
 if [[ "$depdir" ]]; then
     [[ ! -e "$depdir" ]] && fatal "dependency directory ${UnderlineON}${depdir}${UnderlineOFF} given but does not exist"
     [[ ! -d "$depdir" ]] && fatal "dependency directory ${UnderlineON}${depdir}${UnderlineOFF} given but is not a directory"
-    tool_args+="--volume $(abspath "$depdir"):${CDEBB_DIR}/dependencies:ro "
+    tool_args+=(--volume "$(abspath "$depdir"):${CDEBB_DIR}/dependencies:ro")
 fi
 
-tool_args+="--volume $(abspath "$srcdir"):${CDEBB_DIR}/source-ro:ro "
-tool_args+="--volume $(abspath "$outdir"):${CDEBB_DIR}/output "
-tool_args+="--volume $(abspath "$PROG_DIR")/build-helper.sh:${CDEBB_DIR}/build-helper.sh:ro "
-tool_args+="--mount type=tmpfs,destination=/tmp "
+tool_args+=(--volume "$(abspath "$srcdir"):${CDEBB_DIR}/source-ro:ro")
+tool_args+=(--volume "$(abspath "$outdir"):${CDEBB_DIR}/output")
+tool_args+=(--volume "$(abspath "$PROG_DIR")/build-helper.sh:${CDEBB_DIR}/build-helper.sh:ro")
+tool_args+=(--mount "type=tmpfs,destination=/tmp")
 
 # Pass current UID and GID to container, so that it can change the
 # ownership of output files which are otherwise written to outdir as
 # root
 CURR_UID=$(id -u)
 CURR_GID=$(id -g)
-[[ "$tool_version" =~ "Docker" ]] && tool_args+="--env USER=${CURR_UID} --env GROUP=${CURR_GID} "
+[[ "$tool_version" =~ "Docker" ]] && tool_args+=(--env "CDEBB_UID=${CURR_UID}" --env "CDEBB_GID=${CURR_GID}")
 
 # Comment following out if you want to keep container after execution
 # for debugging
-tool_args+="--rm "
+tool_args+=(--rm)
 
 # pass build profiles to use
 if [[ "$profiles" ]]; then
-    tool_args+="--env DEB_BUILD_PROFILES=$profiles --env DEB_BUILD_OPTIONS=$profiles "
+    tool_args+=(--env "DEB_BUILD_PROFILES=$profiles" --env "DEB_BUILD_OPTIONS=$profiles")
 fi
 
 sanitized_image_name=$(sanitize_string "$image")
 
 # share apt package cache
-tool_args+="--volume cdebb__${sanitized_image_name}__apt:/var/cache/apt/archives "
+tool_args+=(--volume "cdebb__${sanitized_image_name}__apt:/var/cache/apt/archives")
 
 # pass whether to use ccache
 if [[ "$use_ccache" ]]; then
-    tool_args+="--env USE_CCACHE=1 --volume cdebb__${sanitized_image_name}__ccache:${CDEBB_DIR}/ccache_dir "
+    tool_args+=(--env USE_CCACHE=1 --volume "cdebb__${sanitized_image_name}__ccache:${CDEBB_DIR}/ccache_dir")
 fi
 
 # pass whether to run Lintian
 if [[ "$run_lintian" ]]; then
-    tool_args+="--env RUN_LINTIAN=1 "
+    tool_args+=(--env RUN_LINTIAN=1)
 fi
 
 # pass whether to run blhc
 if [[ "$run_blhc" ]]; then
-    tool_args+="--env RUN_BLHC=1 "
+    tool_args+=(--env RUN_BLHC=1)
 fi
 
 # pass whether to reset timestamps
 if [[ "$reset_timestamps" ]]; then
-    tool_args+="--env RESET_TIMESTAMPS=1 "
+    tool_args+=(--env RESET_TIMESTAMPS=1)
 fi
 
 # disable any selinux stuff while using rh and derivates with podman
-[[ "$tool_version" =~ "podman" ]] && tool_args+="--security-opt label=disable "
+[[ "$tool_version" =~ "podman" ]] && tool_args+=(--security-opt label=disable)
 
 # run in RAM
-[[ "$tool_version" =~ "podman" ]] && tool_args+="--image-volume=tmpfs "
+[[ "$tool_version" =~ "podman" ]] && tool_args+=(--image-volume=tmpfs)
 
-cmd="$tool run $tool_args $image /bin/bash ${CDEBB_DIR}/build-helper.sh"
 
-log "Running '$tool':"
-log "$cmd"
+log "Running '${tool[*]}':"
+log "${tool[*]} run ${tool_args[*]} $image /bin/bash ${CDEBB_DIR}/build-helper.sh"
 
-exec $cmd
+exec "${tool[@]}" run "${tool_args[@]}" "$image" /bin/bash "${CDEBB_DIR}/build-helper.sh"
