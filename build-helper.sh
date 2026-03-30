@@ -44,11 +44,11 @@ log "Cleaning apt package cache"
 apt-get autoclean
 
 # Install extra dependencies that were provided for the build (if any)
-#   Note: dpkg can fail due to dependencies, ignore errors, and use
-#   apt-get to install those afterwards
+#   Note: dpkg can fail due to unmet dependencies, ignore that specific
+#   error and use apt-get to resolve afterwards
 if [ -d "${CDEBB_DIR}/dependencies" ]; then
     log "Installing extra dependencies"
-    dpkg -i "${CDEBB_DIR}/dependencies"/*.deb || true
+    dpkg -i "${CDEBB_DIR}/dependencies"/*.deb || if [[ $? -ne 1 ]]; then exit 1; fi
     apt-get -f install -y --no-install-recommends
 fi
 
