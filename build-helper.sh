@@ -148,12 +148,18 @@ if [ -n "${RUN_BLHC+x}" ]; then
 fi
 
 # Copy packages to output dir with user's permissions
-if [ -n "${USER+x}" ] && [ -n "${GROUP+x}" ]; then
-    chown "${USER}:${GROUP}" -- *.deb *.buildinfo *.changes *.log
-else
-    chown root:root -- *.deb *.buildinfo *.changes *.log
+shopt -s nullglob
+output_files=(*.deb *.buildinfo *.changes *.log)
+shopt -u nullglob
+
+if [[ ${#output_files[@]} -gt 0 ]]; then
+    if [ -n "${CDEBB_UID+x}" ] && [ -n "${CDEBB_GID+x}" ]; then
+        chown "${CDEBB_UID}:${CDEBB_GID}" -- "${output_files[@]}"
+    else
+        chown root:root -- "${output_files[@]}"
+    fi
+    cp -a -- "${output_files[@]}" "${CDEBB_DIR}/output/"
 fi
-cp -a -- *.deb *.buildinfo *.changes *.log "${CDEBB_DIR}/output/"
 
 log "Generated files:"
 ls -l --almost-all --color=always --human-readable --ignore=*.log "${CDEBB_DIR}/output"
