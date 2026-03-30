@@ -24,7 +24,7 @@ else
 fi
 
 function log {
-    echo -e "${Cyan}[+] $1${Reset}"
+    printf '%b[+] %s%b\n' "${Cyan}" "$1" "${Reset}"
 }
 
 function usage {
@@ -45,7 +45,7 @@ EOF
 }
 
 function fatal {
-    echo -e "${Red}[!]${Reset} ${Bold}$PROG${Reset}: ${Red}${1:-"Unknown Error"}${Reset}" 1>&2
+    printf '%b[!]%b %b%s%b: %b%s%b\n' "${Red}" "${Reset}" "${Bold}" "$PROG" "${Reset}" "${Red}" "${1:-"Unknown Error"}" "${Reset}" 1>&2
     exit 1
 }
 

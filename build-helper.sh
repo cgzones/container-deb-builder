@@ -20,7 +20,7 @@ else
 fi
 
 function log {
-    echo -e "${Blue}[*] $1${Reset}"
+    printf '%b[*] %s%b\n' "${Blue}" "$1" "${Reset}"
 }
 
 CONTAINER_START_TIME="$EPOCHSECONDS"
