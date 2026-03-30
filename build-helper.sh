@@ -86,13 +86,13 @@ mk-build-deps -ir -t "apt-get -o Debug::pkgProblemResolver=yes -y --no-install-r
 log "Building package with DEB_BUILD_OPTIONS set to '${DEB_BUILD_OPTIONS:-}'"
 debuild_args=
 # supported since Debian 11 (bullseye)
-if dpkg-buildpackage --sanitize-env --help &> /dev/null; then
+if dpkg-buildpackage --help 2>&1 | grep -q -- '--sanitize-env'; then
     debuild_args+=' --sanitize-env'
 fi
 
 BUILD_START_TIME="$EPOCHSECONDS"
 # supported since Debian 12 (bookworm)
-if unshare --map-users 1,1,1000 --help &> /dev/null; then
+if unshare --help 2>&1 | grep -q -- '--map-users'; then
     # shellcheck disable=SC2086
     unshare --user --map-root-user --net --map-users 1,1,1000 --map-users 65534,65534,1 --map-groups 1,1,1000 --map-groups 65534,65534,1 --setuid "$(id -u build-runner)" --setgid "$(id -g build-runner)" -- env PATH="/usr/lib/ccache:$PATH" dpkg-buildpackage -rfakeroot -b --no-sign -sa ${debuild_args} 2>&1 | tee "${CDEBB_BUILD_DIR}/build.log"
 else
@@ -107,7 +107,7 @@ cd /
 if [ -n "${USE_CCACHE+x}" ]; then
     log "ccache statistics"
     # supported since Debian 12 (bookworm)
-    if ccache --verbose --help &> /dev/null; then
+    if ccache --help 2>&1 | grep -q -- '--verbose'; then
         ccache --show-stats --verbose
     else
         ccache --show-stats
@@ -121,7 +121,7 @@ if [ -n "${RUN_LINTIAN+x}" ]; then
     useradd --system --user-group --no-create-home --shell /usr/sbin/nologin lintian-runner
     log "+++ Lintian Report Start +++"
     # supported since Debian 11 (bullseye)
-    if lintian --help | grep -w -- '--fail-on\b' &> /dev/null; then
+    if lintian --help 2>&1 | grep -q -- '--fail-on'; then
         runuser -u lintian-runner -- lintian --display-experimental --info --display-info --pedantic --tag-display-limit 0 --color always --verbose --fail-on none "${CDEBB_BUILD_DIR}"/*.changes 2>&1 | tee "${CDEBB_BUILD_DIR}/lintian.log"
     else
         runuser -u lintian-runner -- lintian --display-experimental --info --display-info --pedantic --tag-display-limit 0 --color always --verbose "${CDEBB_BUILD_DIR}"/*.changes 2>&1 | tee "${CDEBB_BUILD_DIR}/lintian.log"
