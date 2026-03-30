@@ -1,11 +1,22 @@
 #!/bin/bash
 
-set -eo pipefail
+set -euo pipefail
 
 PROG=$(basename "$0")
 PROG_DIR=$(dirname "$0")
 
 CDEBB_DIR='/opt/cdebb'
+
+tool=()
+image=
+outdir=
+srcdir=
+profiles=
+depdir=
+reset_timestamps=
+run_blhc=
+use_ccache=
+run_lintian=
 
 if [ -t 0 ] && [ -t 1 ]; then
     Red='\033[0;31m'
