@@ -73,7 +73,7 @@ chown -R --preserve-root build-runner: "${CDEBB_BUILD_DIR}"
 if [ -n "${RESET_TIMESTAMPS+x}" ]; then
     log "Resetting timestamps"
     SOURCE_DATE_RFC2822=$(dpkg-parsechangelog --file "${CDEBB_BUILD_DIR}/source/debian/changelog" --show-field Date)
-    find "${CDEBB_BUILD_DIR}/source" -exec touch -m --no-dereference --date="${SOURCE_DATE_RFC2822}" {} +;
+    find "${CDEBB_BUILD_DIR}/source" -exec touch -m --no-dereference --date="${SOURCE_DATE_RFC2822}" {} +
 fi
 
 cd "${CDEBB_BUILD_DIR}/source"
