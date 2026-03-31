@@ -187,6 +187,7 @@ CURR_GID=$(id -g)
 # Comment following out if you want to keep container after execution
 # for debugging
 tool_args+=(--rm)
+
 tool_args+=(--env DEBIAN_FRONTEND=noninteractive)
 
 # pass build profiles to use
