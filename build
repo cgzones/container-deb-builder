@@ -227,6 +227,6 @@ fi
 
 
 log "Running '${tool[*]}':"
-log "${tool[*]} run ${tool_args[*]} $image /bin/bash ${CDEBB_DIR}/build-helper.sh"
+log "$(printf '%q ' "${tool[@]}" run "${tool_args[@]}" "$image" /bin/bash "${CDEBB_DIR}/build-helper.sh")"
 
 exec "${tool[@]}" run "${tool_args[@]}" "$image" /bin/bash "${CDEBB_DIR}/build-helper.sh"
