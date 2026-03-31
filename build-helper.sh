@@ -54,7 +54,7 @@ if [ -d "${CDEBB_DIR}/dependencies" ]; then
     apt-get -f install -y --no-install-recommends
 fi
 
-useradd --system --user-group --no-create-home --shell /usr/sbin/nologin build-runner
+useradd --system --user-group --no-create-home --shell /usr/sbin/nologin cdebb-build-runner
 
 # Install ccache
 if [ -n "${USE_CCACHE+x}" ]; then
@@ -62,14 +62,14 @@ if [ -n "${USE_CCACHE+x}" ]; then
     apt-get install -y --no-install-recommends ccache
     export CCACHE_DIR="${CDEBB_DIR}/ccache_dir"
     ccache --zero-stats
-    chown -R --preserve-root build-runner: "${CDEBB_DIR}/ccache_dir"
+    chown -R --preserve-root cdebb-build-runner: "${CDEBB_DIR}/ccache_dir"
 fi
 
 # Make read-write copy of source code
 log "Copying source directory"
 mkdir "${CDEBB_BUILD_DIR}"
 cp -a "${CDEBB_DIR}/source-ro" "${CDEBB_BUILD_DIR}/source"
-chown -R --preserve-root build-runner: "${CDEBB_BUILD_DIR}"
+chown -R --preserve-root cdebb-build-runner: "${CDEBB_BUILD_DIR}"
 
 # Reset timestamps
 if [ -n "${RESET_TIMESTAMPS+x}" ]; then
@@ -95,10 +95,10 @@ fi
 BUILD_START_TIME="$EPOCHSECONDS"
 # supported since Debian 12 (bookworm)
 if unshare --help 2>&1 | grep -q -- '--map-users'; then
-    unshare --user --map-root-user --net --map-users 1,1,1000 --map-users 65534,65534,1 --map-groups 1,1,1000 --map-groups 65534,65534,1 --setuid "$(id -u build-runner)" --setgid "$(id -g build-runner)" -- env PATH="/usr/lib/ccache:$PATH" dpkg-buildpackage -rfakeroot -b --no-sign -sa "${debuild_args[@]}" 2>&1 | tee "${CDEBB_BUILD_DIR}/build.log"
+    unshare --user --map-root-user --net --map-users 1,1,1000 --map-users 65534,65534,1 --map-groups 1,1,1000 --map-groups 65534,65534,1 --setuid "$(id -u cdebb-build-runner)" --setgid "$(id -g cdebb-build-runner)" -- env PATH="/usr/lib/ccache:$PATH" dpkg-buildpackage -rfakeroot -b --no-sign -sa "${debuild_args[@]}" 2>&1 | tee "${CDEBB_BUILD_DIR}/build.log"
 else
     log "unshare(1) does not support --map-users, falling back to runuser(1); build has network access"
-    runuser -u build-runner -- env PATH="/usr/lib/ccache:$PATH" dpkg-buildpackage -rfakeroot -b --no-sign -sa "${debuild_args[@]}" 2>&1 | tee "${CDEBB_BUILD_DIR}/build.log"
+    runuser -u cdebb-build-runner -- env PATH="/usr/lib/ccache:$PATH" dpkg-buildpackage -rfakeroot -b --no-sign -sa "${debuild_args[@]}" 2>&1 | tee "${CDEBB_BUILD_DIR}/build.log"
 fi
 log "Build completed in $((EPOCHSECONDS - BUILD_START_TIME)) seconds"
 
@@ -118,13 +118,13 @@ fi
 if [ -n "${RUN_LINTIAN+x}" ]; then
     log "Installing Lintian"
     apt-get install -y --no-install-recommends lintian
-    useradd --system --user-group --no-create-home --shell /usr/sbin/nologin lintian-runner
+    useradd --system --user-group --no-create-home --shell /usr/sbin/nologin cdebb-lintian-runner
     log "+++ Lintian Report Start +++"
     # supported since Debian 11 (bullseye)
     if lintian --help 2>&1 | grep -q -- '--fail-on'; then
-        runuser -u lintian-runner -- lintian --display-experimental --info --display-info --pedantic --tag-display-limit 0 --color always --verbose --fail-on none "${CDEBB_BUILD_DIR}"/*.changes 2>&1 | tee "${CDEBB_BUILD_DIR}/lintian.log"
+        runuser -u cdebb-lintian-runner -- lintian --display-experimental --info --display-info --pedantic --tag-display-limit 0 --color always --verbose --fail-on none "${CDEBB_BUILD_DIR}"/*.changes 2>&1 | tee "${CDEBB_BUILD_DIR}/lintian.log"
     else
-        runuser -u lintian-runner -- lintian --display-experimental --info --display-info --pedantic --tag-display-limit 0 --color always --verbose "${CDEBB_BUILD_DIR}"/*.changes 2>&1 | tee "${CDEBB_BUILD_DIR}/lintian.log"
+        runuser -u cdebb-lintian-runner -- lintian --display-experimental --info --display-info --pedantic --tag-display-limit 0 --color always --verbose "${CDEBB_BUILD_DIR}"/*.changes 2>&1 | tee "${CDEBB_BUILD_DIR}/lintian.log"
     fi
     log "+++ Lintian Report End +++"
 fi
