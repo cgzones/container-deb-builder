@@ -65,9 +65,9 @@ function abspath {
 }
 
 function sanitize_string {
-    local str=${1//_/}
-    str=${str// /_}
-    echo "${str//[^a-zA-Z0-9_]/-}"
+    local str=${1//_/-}
+    str=${str// /-}
+    echo "${str//[^a-zA-Z0-9-]/-}"
 }
 
 
