@@ -159,11 +159,11 @@ if [ -t 0 ] && [ -t 1 ]; then
 fi
 
 # Check that mandatory parameters are valid
-[[ !    "$outdir"        ]] && fatal "output directory was not given (-o DIR)"
-[[ ! -d "$outdir"        ]] && fatal "output directory ${UnderlineON}${outdir}${UnderlineOFF} does not exist"
-[[ !    "$srcdir"        ]] && fatal "source directory not given"
-[[ ! -r "$srcdir/debian" ]] && fatal "source directory ${UnderlineON}${srcdir}${UnderlineOFF} does not contain debian sub directory"
-[[ !    "$image"         ]] && fatal "docker image name not given (-i IMAGE)"
+[[ !    "$outdir"                ]] && fatal "output directory was not given (-o DIR)"
+[[ ! -d "$outdir"                ]] && fatal "output directory ${UnderlineON}${outdir}${UnderlineOFF} does not exist"
+[[ !    "$srcdir"                ]] && fatal "source directory not given"
+[[ ! -f "$srcdir/debian/control" ]] && fatal "source directory ${UnderlineON}${srcdir}${UnderlineOFF} does not contain debian sub directory"
+[[ !    "$image"                 ]] && fatal "docker image name not given (-i IMAGE)"
 
 # Check that optional parameters are valid
 if [[ "$depdir" ]]; then
