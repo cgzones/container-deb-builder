@@ -61,7 +61,7 @@ function fatal {
 }
 
 function abspath {
-    cd "$1" && pwd
+    (cd "$1" && pwd) || fatal "cannot resolve path: $1"
 }
 
 function sanitize_string {
