@@ -3,7 +3,7 @@
 set -euo pipefail
 
 PROG=$(basename "$0")
-PROG_DIR=$(dirname "$0")
+PROG_DIR=$(cd "$(dirname "$0")" && pwd)
 
 CDEBB_DIR='/opt/cdebb'
 
