@@ -28,9 +28,11 @@ CONTAINER_START_TIME="$EPOCHSECONDS"
 # Remove directory owned by _apt
 trap "rm -rf /var/cache/apt/archives/partial" EXIT
 
-# force colors from dh and dpkg
-export DH_COLORS="always"
-export DPKG_COLORS="always"
+# enable colors from dh and dpkg when attached to a TTY
+if [ -t 0 ] && [ -t 1 ]; then
+    export DH_COLORS="always"
+    export DPKG_COLORS="always"
+fi
 
 log "Updating container"
 apt-get update
