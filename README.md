@@ -71,7 +71,7 @@ the option `-d DIR`, where *DIR* is a directory with `*.deb` files in it.
 
 ### Native builds for foreign architectures
 
-By default all packages are build for the architecture the host is running on.
+By default all packages are built for the architecture the host is running on.
 Docker and Podman however support running containers under a foreign
 architecture via QEMU. This emulation is quite slower than standard cross-
 compiling but enables native builds, which for example includes running tests.
