@@ -8,7 +8,6 @@ RUN set -ex \
     && apt-get dist-upgrade -y --no-install-recommends --purge \
     && apt-get install -y --no-install-recommends --purge \
     build-essential \
-    cdbs \
     devscripts \
     equivs \
     fakeroot \
