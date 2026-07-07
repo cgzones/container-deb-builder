@@ -1,0 +1,3 @@
+# No Dockerfile uses COPY/ADD, so nothing from the build context is needed.
+# Exclude everything to keep the context (and .git) out of image builds.
+*
