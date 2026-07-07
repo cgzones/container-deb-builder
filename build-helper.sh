@@ -23,6 +23,33 @@ function log {
     printf '%b[*] %s%b\n' "${Blue}" "$1" "${Reset}"
 }
 
+# Save a colored copy of each log file, then strip ANSI escapes from the original
+function save_color_logs {
+    local f
+    for f in "$@"; do
+        [ -f "$f" ] || continue
+        cp "$f" "${f%.log}.color.log"
+        sed -E -i 's/\x1b\[[0-9;]*[a-zA-Z]//g' "$f"
+    done
+}
+
+# Copy build artifacts and logs from the current directory to the output volume,
+# owned by the invoking user when their UID/GID were passed in (Docker)
+function copy_to_output {
+    shopt -s nullglob
+    local output_files=(*.deb *.buildinfo *.changes *.log)
+    shopt -u nullglob
+
+    [[ ${#output_files[@]} -eq 0 ]] && return 0
+
+    if [ -n "${CDEBB_UID+x}" ] && [ -n "${CDEBB_GID+x}" ]; then
+        chown "${CDEBB_UID}:${CDEBB_GID}" -- "${output_files[@]}"
+    else
+        chown root:root -- "${output_files[@]}"
+    fi
+    cp -a -- "${output_files[@]}" "${CDEBB_DIR}/output/"
+}
+
 CONTAINER_START_TIME="$EPOCHSECONDS"
 
 # Remove directory owned by _apt
@@ -62,14 +89,14 @@ if [ -n "${USE_CCACHE+x}" ]; then
     apt-get install -y --no-install-recommends ccache
     export CCACHE_DIR="${CDEBB_DIR}/ccache_dir"
     ccache --zero-stats
-    chown -R --preserve-root cdebb-build-runner: "${CDEBB_DIR}/ccache_dir"
+    chown -R cdebb-build-runner: "${CDEBB_DIR}/ccache_dir"
 fi
 
 # Make read-write copy of source code
 log "Copying source directory"
 mkdir "${CDEBB_BUILD_DIR}"
 cp -a "${CDEBB_DIR}/source-ro" "${CDEBB_BUILD_DIR}/source"
-chown -R --preserve-root cdebb-build-runner: "${CDEBB_BUILD_DIR}"
+chown -R cdebb-build-runner: "${CDEBB_BUILD_DIR}"
 
 # Reset timestamps
 if [ -n "${RESET_TIMESTAMPS+x}" ]; then
@@ -92,15 +119,35 @@ if dpkg-buildpackage --help 2>&1 | grep -q -- '--sanitize-env'; then
     debuild_args+=(--sanitize-env)
 fi
 
-BUILD_START_TIME="$EPOCHSECONDS"
-# supported since Debian 12 (bookworm)
-if unshare --help 2>&1 | grep -q -- '--map-users'; then
-    unshare --user --map-root-user --net --map-users 1,1,1000 --map-users 65534,65534,1 --map-groups 1,1,1000 --map-groups 65534,65534,1 --setuid "$(id -u cdebb-build-runner)" --setgid "$(id -g cdebb-build-runner)" -- env PATH="/usr/lib/ccache:$PATH" dpkg-buildpackage -rfakeroot -b --no-sign -sa "${debuild_args[@]}" 2>&1 | tee "${CDEBB_BUILD_DIR}/build.log"
-else
-    log "unshare(1) does not support --map-users, falling back to runuser(1); build has network access"
-    runuser -u cdebb-build-runner -- env PATH="/usr/lib/ccache:$PATH" dpkg-buildpackage -rfakeroot -b --no-sign -sa "${debuild_args[@]}" 2>&1 | tee "${CDEBB_BUILD_DIR}/build.log"
+# Prepend ccache to PATH only when enabled
+build_path="$PATH"
+if [ -n "${USE_CCACHE+x}" ]; then
+    build_path="/usr/lib/ccache:$PATH"
 fi
-log "Build completed in $((EPOCHSECONDS - BUILD_START_TIME)) seconds"
+
+# supported since Debian 12 (bookworm)
+function run_build {
+    if unshare --help 2>&1 | grep -q -- '--map-users'; then
+        unshare --user --map-root-user --net --map-users 1,1,1000 --map-users 65534,65534,1 --map-groups 1,1,1000 --map-groups 65534,65534,1 --setuid "$(id -u cdebb-build-runner)" --setgid "$(id -g cdebb-build-runner)" -- env PATH="$build_path" dpkg-buildpackage -rfakeroot -b --no-sign "${debuild_args[@]}" 2>&1 | tee "${CDEBB_BUILD_DIR}/build.log"
+    else
+        log "unshare(1) does not support --map-users, falling back to runuser(1); build has network access"
+        runuser -u cdebb-build-runner -- env PATH="$build_path" dpkg-buildpackage -rfakeroot -b --no-sign "${debuild_args[@]}" 2>&1 | tee "${CDEBB_BUILD_DIR}/build.log"
+    fi
+}
+
+BUILD_START_TIME="$EPOCHSECONDS"
+build_status=0
+run_build || build_status=$?
+log "Build finished in $((EPOCHSECONDS - BUILD_START_TIME)) seconds"
+
+# On failure, salvage the build log to the output dir before aborting
+if [[ $build_status -ne 0 ]]; then
+    cd "${CDEBB_BUILD_DIR}"
+    log "Build failed with exit status ${build_status}; copying logs to output"
+    save_color_logs build.log
+    copy_to_output
+    exit "$build_status"
+fi
 
 cd /
 
@@ -131,10 +178,7 @@ fi
 
 # Save colored versions of logs before stripping ANSI escape sequences
 cd "${CDEBB_BUILD_DIR}"
-for f in *.log; do
-    cp "$f" "${f%.log}.color.log"
-    sed -E -i 's/\x1b\[[0-9;]*[a-zA-Z]//g' "$f"
-done
+save_color_logs ./*.log
 
 # Run blhc
 if [ -n "${RUN_BLHC+x}" ]; then
@@ -143,23 +187,11 @@ if [ -n "${RUN_BLHC+x}" ]; then
     log "+++ blhc Report Start +++"
     blhc --all --color "${CDEBB_BUILD_DIR}/build.log" 2>&1 | tee "${CDEBB_BUILD_DIR}/blhc.log" || true
     log "+++ blhc Report End +++"
-    cp "${CDEBB_BUILD_DIR}/blhc.log" "${CDEBB_BUILD_DIR}/blhc.color.log"
-    sed -E -i 's/\x1b\[[0-9;]*[a-zA-Z]//g' "${CDEBB_BUILD_DIR}/blhc.log"
+    save_color_logs "${CDEBB_BUILD_DIR}/blhc.log"
 fi
 
-# Copy packages to output dir with user's permissions
-shopt -s nullglob
-output_files=(*.deb *.buildinfo *.changes *.log)
-shopt -u nullglob
-
-if [[ ${#output_files[@]} -gt 0 ]]; then
-    if [ -n "${CDEBB_UID+x}" ] && [ -n "${CDEBB_GID+x}" ]; then
-        chown "${CDEBB_UID}:${CDEBB_GID}" -- "${output_files[@]}"
-    else
-        chown root:root -- "${output_files[@]}"
-    fi
-    cp -a -- "${output_files[@]}" "${CDEBB_DIR}/output/"
-fi
+# Copy packages and logs to output dir with user's permissions
+copy_to_output
 
 log "Generated files:"
 ls -l --almost-all --color=always --human-readable --ignore=*.log "${CDEBB_DIR}/output"
