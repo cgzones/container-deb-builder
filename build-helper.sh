@@ -85,7 +85,7 @@ log "Installing build dependencies"
 mk-build-deps -ir -t "apt-get -o Debug::pkgProblemResolver=yes -y --no-install-recommends"
 
 # Build packages
-log "Building package with DEB_BUILD_OPTIONS set to '${DEB_BUILD_OPTIONS:-}'"
+log "Building package (DEB_BUILD_PROFILES='${DEB_BUILD_PROFILES:-}', DEB_BUILD_OPTIONS='${DEB_BUILD_OPTIONS:-}')"
 debuild_args=()
 # supported since Debian 11 (bullseye)
 if dpkg-buildpackage --help 2>&1 | grep -q -- '--sanitize-env'; then

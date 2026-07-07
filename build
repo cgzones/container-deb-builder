@@ -12,6 +12,7 @@ image=
 outdir=
 srcdir=
 profiles=
+options=
 depdir=
 reset_timestamps=
 run_blhc=
@@ -46,7 +47,8 @@ Options:
   -c PROGRAM   Use a custom container engine.
   -o DIR       Destination directory to store packages to.
   -d DIR       Directory that contains other deb packages that need to be installed before build.
-  -p profiles  Specify the profiles to build (e.g. nocheck). Takes a comma separated list.
+  -p profiles  Specify the build profiles (e.g. nocheck), sets DEB_BUILD_PROFILES. Takes a comma separated list.
+  -O options   Specify the build options (e.g. nocheck), sets DEB_BUILD_OPTIONS. Takes a comma separated list.
   -C           Use ccache to cache compiled objects.
   -L           Run Lintian after a successful build.
   -B           Run blhc after a successful build.
@@ -65,9 +67,7 @@ function abspath {
 }
 
 function sanitize_string {
-    local str=${1//_/-}
-    str=${str// /-}
-    echo "${str//[^a-zA-Z0-9-]/-}"
+    echo "${1//[^a-zA-Z0-9-]/-}"
 }
 
 
@@ -75,7 +75,7 @@ function sanitize_string {
 
 [[ $# -eq 0 ]] && usage
 
-while getopts "c:i:o:p:d:htBCL" opt; do
+while getopts "c:i:o:O:p:d:htBCL" opt; do
     case $opt in
         c)
             [[ ${#tool[@]} -gt 0 ]] && fatal "Container engine specified multiple times"
@@ -92,6 +92,10 @@ while getopts "c:i:o:p:d:htBCL" opt; do
         p)
             [[ "$profiles" ]] && fatal "Build profiles specified multiple times"
             profiles="$OPTARG"
+            ;;
+        O)
+            [[ "$options" ]] && fatal "Build options specified multiple times"
+            options="$OPTARG"
             ;;
         d)
             [[ "$depdir" ]] && fatal "Dependency directory specified multiple times"
@@ -150,6 +154,7 @@ if [[ ${#tool[@]} -eq 0 ]]; then
 fi
 
 [[ ${#tool[@]} -eq 0 ]] && fatal "neither podman nor docker found"
+command -v "${tool[0]}" >/dev/null 2>&1 || fatal "container engine ${UnderlineON}${tool[0]}${UnderlineOFF} not found"
 tool_version=$("${tool[@]}" --version)
 
 tool_args=(--interactive)
@@ -192,7 +197,12 @@ tool_args+=(--env DEBIAN_FRONTEND=noninteractive)
 
 # pass build profiles to use
 if [[ "$profiles" ]]; then
-    tool_args+=(--env "DEB_BUILD_PROFILES=$profiles" --env "DEB_BUILD_OPTIONS=$profiles")
+    tool_args+=(--env "DEB_BUILD_PROFILES=$profiles")
+fi
+
+# pass build options to use
+if [[ "$options" ]]; then
+    tool_args+=(--env "DEB_BUILD_OPTIONS=$options")
 fi
 
 sanitized_image_name=$(sanitize_string "$image")
@@ -227,7 +237,9 @@ fi
 [[ "$tool_version" =~ "podman" ]] && tool_args+=(--image-volume=tmpfs)
 
 
-log "Running '${tool[*]}':"
-log "$(printf '%q ' "${tool[@]}" run "${tool_args[@]}" "$image" /bin/bash "${CDEBB_DIR}/build-helper.sh")"
+run_cmd=("${tool[@]}" run "${tool_args[@]}" "$image" /bin/bash "${CDEBB_DIR}/build-helper.sh")
 
-exec "${tool[@]}" run "${tool_args[@]}" "$image" /bin/bash "${CDEBB_DIR}/build-helper.sh"
+log "Running '${tool[*]}':"
+log "$(printf '%q ' "${run_cmd[@]}")"
+
+exec "${run_cmd[@]}"
